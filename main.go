@@ -2,89 +2,68 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type CommandList struct {
-	cmds   []Command
-	cursor int
-	lo     *liveoutput
+type MainView struct {
+	commandList *CommandList
+	lo          *liveoutput
 }
 
-type Command struct {
-	cmd         string
-	description string
-	displayName string
-}
-
-func initialModel() CommandList {
-	return CommandList{
-		lo: nil,
-		cmds: []Command{{
-			cmd:         "echo Test from run",
-			description: "This is test command",
-			displayName: "Test Command",
-		}, {
-			cmd:         "echo \"Test from run 2\"",
-			description: "This is test command 2",
-			displayName: "Test Command 2",
-		}},
+func initialModel() MainView {
+	list := NewCommandList()
+	return MainView{
+		commandList: &list,
 	}
 }
 
-func (m CommandList) Init() tea.Cmd {
+func (m MainView) Init() tea.Cmd {
 	return nil
 }
 
-func (m CommandList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
-	switch msg := msg.(type) {
-	case loClosed:
-		m.lo = nil
-		return m, nil
-	case tea.KeyMsg:
-		// TODO: This should work like this. Make one component responsible for passing udpates
-		// around. For example if LO is nil then display list. Add maybe some global keybinds on it
-		// and the rest will be handled by child components
-		if m.lo == nil {
-			switch msg.String() {
-			case "ctrl+c", "q":
-				return m, tea.Quit
-			case "up", "k":
-				if m.cursor > 0 {
-					m.cursor--
-				}
-			case "down", "j":
-				if m.cursor < len(m.cmds)-1 {
-					m.cursor++
-				}
 
-			case "enter", " ":
-				{
-					command := m.cmds[m.cursor]
-					m.lo = &liveoutput{
-						sub:                make(chan string),
-						commandDisplayName: command.displayName,
-						command:            command.cmd,
-					}
-					return m, m.lo.Init()
-				}
-			case "ctrl+l":
-				return m, wrapMsg(tea.ClearScreen())
-			}
-		}
-	}
-
-	if m.lo != nil {
-		mlo, cmd := m.lo.Update(msg)
-		var test liveoutput = mlo.(liveoutput)
-		m.lo = &test
+	if m.commandList != nil {
+		mResp, cmd := m.commandList.Update(msg)
+		typedMResp := mResp.(CommandList)
+		m.commandList = &typedMResp
 		cmds = append(cmds, cmd)
 	}
 
+	if m.lo != nil {
+		mResp, cmd := m.lo.Update(msg)
+		typedMResp := mResp.(liveoutput)
+		m.lo = &typedMResp
+		cmds = append(cmds, cmd)
+	}
+
+	switch msg := msg.(type) {
+	case SelectedCommandEntry:
+		{
+			m.commandList = nil
+			m.lo = &liveoutput{
+				sub:                make(chan string),
+				commandDisplayName: msg.command.displayName,
+				command:            msg.command.cmd,
+			}
+			return m, m.lo.Init()
+		}
+	}
+
 	return m, tea.Batch(cmds...)
+}
+
+func (m MainView) View() string {
+	if m.commandList != nil {
+		return m.commandList.View()
+	} else if m.lo != nil {
+		return m.lo.View()
+	}
+	return "Missing output"
 }
 
 func wrapMsg(msg tea.Msg) tea.Cmd {
@@ -93,27 +72,16 @@ func wrapMsg(msg tea.Msg) tea.Cmd {
 	}
 }
 
-func (m CommandList) View() string {
-	if m.lo != nil {
-		return m.lo.View()
-	}
-	s := "Please select command \n"
-
-	for i, choice := range m.cmds {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-
-		s += fmt.Sprintf("%s %s\n", cursor, choice.displayName)
-	}
-
-	s += "\nPress q to quit.\n"
-
-	return s
-}
-
 func main() {
+	fo, _ := os.OpenFile("out.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	defer fo.Close()
+
+	logginLevel := new(slog.LevelVar)
+	slog.SetDefault(slog.New(
+		slog.NewTextHandler(fo, &slog.HandlerOptions{Level: logginLevel})))
+	logginLevel.Set(slog.LevelDebug)
+	slog.Info("Logger configured")
+
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

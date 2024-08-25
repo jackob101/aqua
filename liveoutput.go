@@ -73,7 +73,7 @@ func (m liveoutput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m liveoutput) View() string {
-	s := m.commandDisplayName
+	s := m.command
 	s = s + "\n----Output----\n\n"
 	for _, v := range m.lines {
 		s = s + v + "\n"
