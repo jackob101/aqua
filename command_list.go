@@ -21,7 +21,7 @@ func (c Command) Title() string {
 }
 
 func (c Command) Description() string {
-	return c.description
+	return c.cmd
 }
 
 func (c Command) FilterValue() string {
@@ -43,8 +43,8 @@ func NewCommandList() CommandList {
 
 	commandList := list.New(items,
 		list.NewDefaultDelegate(),
-		0,
-		0,
+		Width,
+		Height,
 	)
 	commandList.Title = "Commands"
 
@@ -59,20 +59,34 @@ func (m CommandList) Init() tea.Cmd {
 }
 
 func (m CommandList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmds := []tea.Cmd{}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "enter" {
-			return m, wrapMsg(SelectedCommandEntry{command: m.list.SelectedItem().(Command)})
-		}
+		var cmd tea.Cmd
+		m, cmd = m.handleKeybind(msg)
+		cmds = append(cmds, cmd)
 	case tea.WindowSizeMsg:
 		m.list.SetSize(msg.Width, msg.Height)
 	}
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	cmds = append(cmds, cmd)
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m CommandList) View() string {
 	return m.list.View()
+}
+
+func (m CommandList) handleKeybind(msg tea.KeyMsg) (CommandList, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		selected := m.list.SelectedItem()
+		if selected != nil {
+			return m, wrapMsg(SelectedCommandEntry{command: selected.(Command)})
+		}
+	}
+	return m, nil
 }

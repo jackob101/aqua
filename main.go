@@ -40,16 +40,13 @@ func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SelectedCommandEntry:
 		{
 			m.commandList = nil
-			m.lo = &liveoutput{
-				sub:                make(chan string),
-				commandDisplayName: msg.command.displayName,
-				command:            msg.command.cmd,
-			}
+			lo := NewLiveoutput(msg.command)
+			m.lo = &lo
 			return m, m.lo.Init()
 		}
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
+		case "ctrl+c":
 			{
 				return m, tea.Quit
 			}
@@ -57,6 +54,11 @@ func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		Width = msg.Width
 		Height = msg.Height
+	case loClosed:
+		m.lo = nil
+		newCommandList := NewCommandList()
+		// cmds = append(cmds, newCommandList.Init())
+		m.commandList = &newCommandList
 	}
 
 	if m.commandList != nil {

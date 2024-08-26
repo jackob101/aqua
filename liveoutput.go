@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"jackob101/run/common"
 	"os/exec"
 	"strings"
 	"time"
@@ -33,6 +34,7 @@ type liveoutput struct {
 	lines              string
 	finished           bool
 	viewport           viewport.Model
+	helpMenu           common.Keybinds[liveoutput]
 }
 
 type newline struct {
@@ -77,7 +79,23 @@ func NewLiveoutput(cmd Command) liveoutput {
 		commandDisplayName: cmd.displayName,
 		command:            cmd.cmd,
 		lines:              "",
+		finished:           false,
+		viewport:           viewport.Model{},
+		helpMenu: common.NewHelpMenu([]common.Keybind[liveoutput]{
+			{
+				Callback: func(m common.Keybinds[liveoutput]) (common.Keybinds[liveoutput], tea.Cmd) {
+					return m, tea.Quit
+				},
+				Description: "Test keybind",
+				Menu:        common.Both,
+				Keys:        []string{"esc"},
+			},
+		}, Width),
 	}
+}
+
+func (m liveoutput) GetKeybinds() common.Keybinds[liveoutput] {
+	return common.Keybinds[liveoutput]{}
 }
 
 func (m liveoutput) Init() tea.Cmd {
@@ -91,6 +109,18 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	cmds := []tea.Cmd{}
 
 	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		var cmd tea.Cmd
+		m.helpMenu, cmd = m.helpMenu.Update(msg)
+		cmds = append(cmds, cmd)
+		// switch msg.String() {
+		// case "esc":
+		// 	{
+		// 		if m.finished {
+		// 			return m, wrapMsg(loClosed{})
+		// 		}
+		// 	}
+		// }
 	case newline:
 		m.lines += msg.content
 		if !strings.HasSuffix("\n", msg.content) {
@@ -116,13 +146,19 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 }
 
 func (m liveoutput) View() string {
-	return fmt.Sprintf("%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView())
+	return fmt.Sprintf("%s\n%s\n%s\n%s",
+		m.headerView(),
+		m.viewport.View(),
+		m.footerView(),
+		m.helpMenu.View(),
+	)
 }
 
 func (lo *liveoutput) initViewport() {
+	helpMenuHeight := lipgloss.Height(lo.helpMenu.View())
 	headerHeight := lipgloss.Height(lo.headerView())
 	footerHeight := lipgloss.Height(lo.footerView())
-	verticalMarginHeight := headerHeight + footerHeight
+	verticalMarginHeight := headerHeight + footerHeight + helpMenuHeight
 	lo.viewport = viewport.New(Width, Height-verticalMarginHeight)
 	lo.viewport.YPosition = headerHeight
 	lo.viewport.HighPerformanceRendering = false
@@ -132,13 +168,19 @@ func (lo *liveoutput) initViewport() {
 }
 
 func (m liveoutput) headerView() string {
-	title := titleStyle.Render("Mr. Pager")
+	title := titleStyle.Render(m.commandDisplayName)
 	line := strings.Repeat("─", max(0, Width-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }
 
 func (m liveoutput) footerView() string {
-	info := infoStyle.Render(fmt.Sprintf("%3.f%%", 0.0*100))
+	var message string
+	if m.finished {
+		message = "Finished"
+	} else {
+		message = "Running"
+	}
+	info := infoStyle.Render(message)
 	line := strings.Repeat("─", max(0, Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
 }
