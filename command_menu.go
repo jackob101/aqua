@@ -35,7 +35,7 @@ func NewCommandList() CommandList {
 			description: "This is test command",
 			displayName: "Test Command",
 		}, Command{
-			cmd:         "echo \"Test from run 2\"",
+			cmd:         "./test.sh",
 			description: "This is test command 2",
 			displayName: "Test Command 2",
 		},

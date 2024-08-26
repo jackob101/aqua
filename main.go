@@ -4,8 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
 
 	tea "github.com/charmbracelet/bubbletea"
+)
+
+var (
+	Width  int = 0
+	Height int = 0
 )
 
 type MainView struct {
@@ -25,21 +31,10 @@ func (m MainView) Init() tea.Cmd {
 }
 
 func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	slog.Debug("Message",
+		"Type", reflect.TypeOf(msg),
+		"Value", fmt.Sprintf("%+v", msg))
 	cmds := []tea.Cmd{}
-
-	if m.commandList != nil {
-		mResp, cmd := m.commandList.Update(msg)
-		typedMResp := mResp.(CommandList)
-		m.commandList = &typedMResp
-		cmds = append(cmds, cmd)
-	}
-
-	if m.lo != nil {
-		mResp, cmd := m.lo.Update(msg)
-		typedMResp := mResp.(liveoutput)
-		m.lo = &typedMResp
-		cmds = append(cmds, cmd)
-	}
 
 	switch msg := msg.(type) {
 	case SelectedCommandEntry:
@@ -52,6 +47,29 @@ func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.lo.Init()
 		}
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			{
+				return m, tea.Quit
+			}
+		}
+	case tea.WindowSizeMsg:
+		Width = msg.Width
+		Height = msg.Height
+	}
+
+	if m.commandList != nil {
+		mResp, cmd := m.commandList.Update(msg)
+		typedMResp := mResp.(CommandList)
+		m.commandList = &typedMResp
+		cmds = append(cmds, cmd)
+	}
+
+	if m.lo != nil {
+		lo, cmd := m.lo.Update(msg)
+		m.lo = &lo
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -82,7 +100,10 @@ func main() {
 	logginLevel.Set(slog.LevelDebug)
 	slog.Info("Logger configured")
 
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(),
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
 
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Failed to run program %v", err)
