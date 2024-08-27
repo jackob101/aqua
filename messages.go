@@ -5,3 +5,5 @@ type SelectedCommandEntry struct {
 }
 
 type LoadViewport struct{}
+
+type Liveoutput_Quit struct{}

@@ -22,8 +22,8 @@ var (
 
 	infoStyle = func() lipgloss.Style {
 		b := lipgloss.RoundedBorder()
-		b.Left = "┤"
-		return titleStyle.BorderStyle(b)
+		b.Right = "├"
+		return titleStyle.Padding(0, 1).BorderStyle(b)
 	}()
 )
 
@@ -34,7 +34,7 @@ type liveoutput struct {
 	lines              string
 	finished           bool
 	viewport           viewport.Model
-	helpMenu           common.Keybinds[liveoutput]
+	helpMenu           common.Keybinds
 }
 
 type newline struct {
@@ -81,21 +81,19 @@ func NewLiveoutput(cmd Command) liveoutput {
 		lines:              "",
 		finished:           false,
 		viewport:           viewport.Model{},
-		helpMenu: common.NewHelpMenu([]common.Keybind[liveoutput]{
+		helpMenu: common.NewKeybindHandler([]common.Keybind{
 			{
-				Callback: func(m common.Keybinds[liveoutput]) (common.Keybinds[liveoutput], tea.Cmd) {
-					return m, tea.Quit
-				},
-				Description: "Test keybind",
-				Menu:        common.Both,
-				Keys:        []string{"esc"},
+				Message:            Liveoutput_Quit{},
+				Description:        "Close liveoutput",
+				DisplayInShortMenu: true,
+				Keys:               []string{"esc"},
 			},
 		}, Width),
 	}
 }
 
-func (m liveoutput) GetKeybinds() common.Keybinds[liveoutput] {
-	return common.Keybinds[liveoutput]{}
+func (m liveoutput) GetKeybinds() common.Keybinds {
+	return common.Keybinds{}
 }
 
 func (m liveoutput) Init() tea.Cmd {
@@ -113,14 +111,6 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		var cmd tea.Cmd
 		m.helpMenu, cmd = m.helpMenu.Update(msg)
 		cmds = append(cmds, cmd)
-		// switch msg.String() {
-		// case "esc":
-		// 	{
-		// 		if m.finished {
-		// 			return m, wrapMsg(loClosed{})
-		// 		}
-		// 	}
-		// }
 	case newline:
 		m.lines += msg.content
 		if !strings.HasSuffix("\n", msg.content) {
@@ -136,6 +126,9 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.initViewport()
 		cmds = append(cmds, viewport.Sync(m.viewport))
+	case Liveoutput_Quit:
+		m.finished = true
+		return m, func() tea.Msg { return loClosed{} }
 	}
 
 	var cmd tea.Cmd
@@ -182,7 +175,7 @@ func (m liveoutput) footerView() string {
 	}
 	info := infoStyle.Render(message)
 	line := strings.Repeat("─", max(0, Width-lipgloss.Width(info)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
+	return lipgloss.JoinHorizontal(lipgloss.Center, info, line)
 }
 
 func max(a, b int) int {
