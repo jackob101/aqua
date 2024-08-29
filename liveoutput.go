@@ -32,8 +32,9 @@ var (
 )
 
 type LiveoutputKeybinds struct {
-	Close key.Binding
-	Stop  key.Binding
+	Close   key.Binding
+	Stop    key.Binding
+	Restart key.Binding
 }
 
 var keybinds = LiveoutputKeybinds{
@@ -45,10 +46,14 @@ var keybinds = LiveoutputKeybinds{
 		key.WithKeys("s"),
 		key.WithHelp("s", "Stops the command"),
 	),
+	Restart: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "Restart the command"),
+	),
 }
 
 func (k LiveoutputKeybinds) ShortHelp() []key.Binding {
-	return []key.Binding{k.Close, k.Stop}
+	return []key.Binding{k.Close, k.Stop, k.Restart}
 }
 
 func (k LiveoutputKeybinds) FullHelp() [][]key.Binding {
@@ -79,6 +84,7 @@ type loFinished struct{}
 
 type loClosed struct{}
 
+// TODO: This is not killing the command... But is should!
 func (m liveoutput) listenForNewline() tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("bash", "-c", m.command)
@@ -159,6 +165,14 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 				Width,
 				confirmationDialogHeight)
 			m.closeConfirmation = &confirmationDialog
+		case key.Matches(msg, keybinds.Restart):
+			if m.finished {
+				m.lines = ""
+				m.sub = make(chan string)
+				m.finished = false
+				m.viewport.SetContent(m.lines)
+				return m, tea.Batch(m.listenForNewline(), m.waitForNewline(), m.runtime.Reset(), m.runtime.Start())
+			}
 		}
 	case newline:
 		m.lines += msg.content
