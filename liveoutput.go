@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"jackob101/run/common"
 	"jackob101/run/styles"
 	"os/exec"
 	"strings"
@@ -67,6 +68,7 @@ type liveoutput struct {
 	viewport           viewport.Model
 	helpMenu           help.Model
 	runtime            stopwatch.Model
+	closeConfirmation  *common.Confirmation
 }
 
 type newline struct {
@@ -112,14 +114,14 @@ func (m liveoutput) waitForNewline() tea.Cmd {
 	}
 }
 
-func NewLiveoutput(cmd Command) liveoutput {
+func NewLiveoutput(cmd string, displayName string) liveoutput {
 	helpMenu := help.New()
 	helpMenu.Styles = styles.MenuStyles
 	return liveoutput{
 		sub:                make(chan string),
 		subStop:            make(chan bool, 1),
-		commandDisplayName: cmd.displayName,
-		command:            cmd.cmd,
+		commandDisplayName: displayName,
+		command:            cmd,
 		lines:              "",
 		finished:           false,
 		viewport:           viewport.Model{},
@@ -131,7 +133,7 @@ func NewLiveoutput(cmd Command) liveoutput {
 func (m liveoutput) Init() tea.Cmd {
 	return tea.Batch(m.listenForNewline(),
 		m.waitForNewline(),
-		wrapMsg(LoadViewport{}),
+		wrapMsg(common.LoadViewport{}),
 		m.runtime.Init(),
 	)
 }
@@ -152,7 +154,11 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 			cmds = append(cmds, m.runtime.Stop())
 		case key.Matches(msg, keybinds.Close):
 			m.finished = true
-			return m, func() tea.Msg { return loClosed{} }
+			confirmationDialogHeight := lipgloss.Height(m.viewport.View())
+			confirmationDialog := common.NewConfirmation("Do You want to close liveouput?",
+				Width,
+				confirmationDialogHeight)
+			m.closeConfirmation = &confirmationDialog
 		}
 	case newline:
 		m.lines += msg.content
@@ -165,11 +171,23 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	case loFinished:
 		m.finished = true
 		cmds = append(cmds, m.runtime.Stop())
-	case LoadViewport:
+	case common.LoadViewport:
 		m.initViewport()
 	case tea.WindowSizeMsg:
 		m.initViewport()
 		cmds = append(cmds, viewport.Sync(m.viewport))
+	case common.Confirmation_Selected:
+		if msg.Selected {
+			return m, func() tea.Msg { return loClosed{} }
+		} else {
+			m.closeConfirmation = nil
+		}
+	}
+
+	if m.closeConfirmation != nil {
+		newConfirmation, cmd := m.closeConfirmation.Update(msg)
+		m.closeConfirmation = &newConfirmation
+		return m, cmd
 	}
 
 	var cmd tea.Cmd
@@ -183,9 +201,15 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 }
 
 func (m liveoutput) View() string {
+	var mainBody string
+	if m.closeConfirmation != nil {
+		mainBody = m.closeConfirmation.View()
+	} else {
+		mainBody = m.viewport.View()
+	}
 	return fmt.Sprintf("%s\n%s\n%s\n%s",
 		m.headerView(),
-		m.viewport.View(),
+		mainBody,
 		m.footerView(),
 		styles.MenuStyle().Render(m.helpMenu.View(keybinds)),
 	)

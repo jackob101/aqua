@@ -1,6 +1,8 @@
 package main
 
 import (
+	"jackob101/run/common"
+
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -85,7 +87,12 @@ func (m CommandList) handleKeybind(msg tea.KeyMsg) (CommandList, tea.Cmd) {
 	case "enter":
 		selected := m.list.SelectedItem()
 		if selected != nil {
-			return m, wrapMsg(SelectedCommandEntry{command: selected.(Command)})
+			cmd := selected.(Command)
+			return m, wrapMsg(common.SelectedCommandEntry{
+				Cmd:         cmd.cmd,
+				Description: cmd.description,
+				DisplayName: cmd.displayName,
+			})
 		}
 	}
 	return m, nil

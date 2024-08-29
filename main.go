@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"jackob101/run/common"
 	"log/slog"
 	"os"
 	"reflect"
@@ -37,10 +38,10 @@ func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
 
 	switch msg := msg.(type) {
-	case SelectedCommandEntry:
+	case common.SelectedCommandEntry:
 		{
 			m.commandList = nil
-			lo := NewLiveoutput(msg.command)
+			lo := NewLiveoutput(msg.Cmd, msg.DisplayName)
 			m.lo = &lo
 			return m, m.lo.Init()
 		}
