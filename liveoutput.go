@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/stopwatch"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,70 +18,51 @@ import (
 
 var (
 	titleStyle = func() lipgloss.Style {
-		b := lipgloss.RoundedBorder()
+		b := lipgloss.NormalBorder()
 		b.Right = "├"
 		return lipgloss.NewStyle().BorderStyle(b).Padding(0, 1)
 	}()
 
 	infoStyle = func() lipgloss.Style {
-		b := lipgloss.RoundedBorder()
-		b.Right = "├"
+		b := lipgloss.NormalBorder()
+		b.Left = "┤"
 		return titleStyle.Padding(0, 1).BorderStyle(b)
 	}()
 )
 
-type LiveoutputKeybinds struct {
-	Close   key.Binding
-	Stop    key.Binding
-	Restart key.Binding
-}
-
-var keybinds = LiveoutputKeybinds{
-	Close: key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "Close liveoutput"),
-	),
-	Stop: key.NewBinding(
-		key.WithKeys("s"),
-		key.WithHelp("s", "Stops the command"),
-	),
-	Restart: key.NewBinding(
-		key.WithKeys("r"),
-		key.WithHelp("r", "Restart the command"),
-	),
-}
-
-func (k LiveoutputKeybinds) ShortHelp() []key.Binding {
-	return []key.Binding{k.Close, k.Stop, k.Restart}
-}
-
-func (k LiveoutputKeybinds) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Close, k.Stop},
-		{},
+func (m liveoutput) getLiveoutputKeybinds() []common.Keybind {
+	liveoutputKeybinds := []common.Keybind{
+		common.NewKeybind(common.LiveoutputClose{}, "close", "esc"),
 	}
+
+	if m.finished {
+		liveoutputKeybinds = append(liveoutputKeybinds,
+			common.NewKeybind(common.LiveoutputCommandRestart{}, "restart command", "r"),
+		)
+	} else {
+		liveoutputKeybinds = append(
+			liveoutputKeybinds, common.NewKeybind(common.LiveoutputCommandStop{}, "stop command", "s"),
+		)
+	}
+	return liveoutputKeybinds
 }
 
 type liveoutput struct {
-	sub                chan string
-	subStop            chan bool
-	commandDisplayName string
-	command            string
-	lines              string
-	finished           bool
-	viewport           viewport.Model
-	helpMenu           help.Model
-	runtime            stopwatch.Model
-	closeConfirmation  *common.Confirmation
+	commandOutputChannel chan string
+	commandStopChannel   chan bool
+	commandDisplayName   string
+	command              string
+	lines                string
+	finished             bool
+	viewport             viewport.Model
+	helpMenu             help.Model
+	runtime              stopwatch.Model
+	closeConfirmation    *common.Confirmation
 }
 
 type newline struct {
 	content string
 }
-
-type loFinished struct{}
-
-type loClosed struct{}
 
 // TODO: This is not killing the command... But is should!
 func (m liveoutput) listenForNewline() tea.Cmd {
@@ -92,47 +72,75 @@ func (m liveoutput) listenForNewline() tea.Cmd {
 		time.Sleep(1 * time.Second)
 		err := cmd.Start()
 		if err != nil {
-			m.sub <- err.Error()
-			return loFinished{}
+			m.commandOutputChannel <- err.Error()
+			return common.LiveoutputCommandFinished{}
 		}
 		buf := bufio.NewReader(stdout)
 		for {
 			select {
-			case value := <-m.subStop:
+			case value := <-m.commandStopChannel:
 				if value {
-					return loFinished{}
+					return common.LiveoutputCommandFinished{}
 				}
 			default:
 			}
 			line, _, err := buf.ReadLine()
 			if err != nil {
-				return loFinished{}
+				return common.LiveoutputCommandFinished{}
 			}
-			m.sub <- string(line)
+			m.commandOutputChannel <- string(line)
 		}
 	}
 }
 
 func (m liveoutput) waitForNewline() tea.Cmd {
 	return func() tea.Msg {
-		content := <-m.sub
+		content := <-m.commandOutputChannel
 		return newline{content}
 	}
+}
+
+func (m *liveoutput) stopCommand() tea.Cmd {
+	m.finished = true
+	select {
+	case m.commandStopChannel <- true:
+	default:
+	}
+
+	return tea.Batch(m.runtime.Stop(),
+		common.SetKeybindsCmd(m.getLiveoutputKeybinds()),
+	)
+}
+
+func (m *liveoutput) restartCommand() tea.Cmd {
+	if m.finished {
+		m.lines = ""
+		m.commandOutputChannel = make(chan string)
+		m.finished = false
+		m.viewport.SetContent(m.lines)
+		return tea.Batch(m.listenForNewline(),
+			m.waitForNewline(),
+			m.runtime.Reset(),
+			m.runtime.Start(),
+			common.SetKeybindsCmd(m.getLiveoutputKeybinds()),
+		)
+	}
+	return nil
 }
 
 func NewLiveoutput(cmd string, displayName string) liveoutput {
 	helpMenu := help.New()
 	helpMenu.Styles = styles.MenuStyles
 	return liveoutput{
-		sub:                make(chan string),
-		subStop:            make(chan bool, 1),
-		commandDisplayName: displayName,
-		command:            cmd,
-		lines:              "",
-		finished:           false,
-		viewport:           viewport.Model{},
-		helpMenu:           helpMenu,
-		runtime:            stopwatch.New(),
+		commandOutputChannel: make(chan string),
+		commandStopChannel:   make(chan bool, 1),
+		commandDisplayName:   displayName,
+		command:              cmd,
+		lines:                "",
+		finished:             false,
+		viewport:             viewport.Model{},
+		helpMenu:             helpMenu,
+		runtime:              stopwatch.New(),
 	}
 }
 
@@ -141,6 +149,7 @@ func (m liveoutput) Init() tea.Cmd {
 		m.waitForNewline(),
 		wrapMsg(common.LoadViewport{}),
 		m.runtime.Init(),
+		common.MakeCmd(common.SetKeybinds{Keybinds: m.getLiveoutputKeybinds()}),
 	)
 }
 
@@ -148,32 +157,6 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	cmds := []tea.Cmd{}
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, keybinds.Stop):
-			m.finished = true
-			select {
-			case m.subStop <- true:
-			default:
-			}
-			cmds = append(cmds, wrapMsg(loFinished{}))
-			cmds = append(cmds, m.runtime.Stop())
-		case key.Matches(msg, keybinds.Close):
-			m.finished = true
-			confirmationDialogHeight := lipgloss.Height(m.viewport.View())
-			confirmationDialog := common.NewConfirmation("Do You want to close liveouput?",
-				Width,
-				confirmationDialogHeight)
-			m.closeConfirmation = &confirmationDialog
-		case key.Matches(msg, keybinds.Restart):
-			if m.finished {
-				m.lines = ""
-				m.sub = make(chan string)
-				m.finished = false
-				m.viewport.SetContent(m.lines)
-				return m, tea.Batch(m.listenForNewline(), m.waitForNewline(), m.runtime.Reset(), m.runtime.Start())
-			}
-		}
 	case newline:
 		m.lines += msg.content
 		if !strings.HasSuffix("\n", msg.content) {
@@ -182,26 +165,44 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		m.viewport.SetContent(m.lines)
 		m.viewport.GotoBottom()
 		cmds = append(cmds, m.waitForNewline())
-	case loFinished:
+	case common.LiveoutputCommandFinished:
 		m.finished = true
 		cmds = append(cmds, m.runtime.Stop())
+		cmds = append(cmds, common.SetKeybindsCmd(m.getLiveoutputKeybinds()))
 	case common.LoadViewport:
 		m.initViewport()
-	case tea.WindowSizeMsg:
+	case common.ContentSectionResize:
 		m.initViewport()
 		cmds = append(cmds, viewport.Sync(m.viewport))
-	case common.Confirmation_Selected:
-		if msg.Selected {
-			return m, func() tea.Msg { return loClosed{} }
-		} else {
+	case common.LiveoutputClose:
+		confirmationDialogHeight := lipgloss.Height(m.viewport.View())
+		confirmationDialog := common.NewConfirmation("Do You want to close liveouput?",
+			Width,
+			confirmationDialogHeight)
+		m.closeConfirmation = &confirmationDialog
+		cmds = append(cmds, confirmationDialog.Init())
+	case common.LiveoutputCommandRestart:
+		cmds = append(cmds, m.restartCommand())
+	case common.LiveoutputCommandStop:
+		cmds = append(cmds, m.stopCommand())
+	case common.ConfirmationDialogSelected:
+		if m.closeConfirmation != nil {
 			m.closeConfirmation = nil
+			if msg.Value {
+				cmds = append(cmds, m.stopCommand())
+				cmds = append(cmds, common.MakeCmd(common.LiveoutputClosed{}))
+			} else {
+				m.closeConfirmation = nil
+				cmds = append(cmds, common.SetKeybindsCmd(m.getLiveoutputKeybinds()))
+			}
 		}
+
 	}
 
 	if m.closeConfirmation != nil {
 		newConfirmation, cmd := m.closeConfirmation.Update(msg)
 		m.closeConfirmation = &newConfirmation
-		return m, cmd
+		cmds = append(cmds, cmd)
 	}
 
 	var cmd tea.Cmd
@@ -221,19 +222,17 @@ func (m liveoutput) View() string {
 	} else {
 		mainBody = m.viewport.View()
 	}
-	return fmt.Sprintf("%s\n%s\n%s\n%s",
+	return fmt.Sprintf("%s\n%s",
 		m.headerView(),
 		mainBody,
-		m.footerView(),
-		styles.MenuStyle().Render(m.helpMenu.View(keybinds)),
+		// styles.MenuStyle().Render(m.helpMenu.View(keybinds)),
 	)
 }
 
 func (lo *liveoutput) initViewport() {
-	helpMenuHeight := lipgloss.Height(styles.MenuStyle().Render(lo.helpMenu.View(keybinds)))
+	// helpMenuHeight := lipgloss.Height(styles.MenuStyle().Render(lo.helpMenu.View(keybinds)))
 	headerHeight := lipgloss.Height(lo.headerView())
-	footerHeight := lipgloss.Height(lo.footerView())
-	verticalMarginHeight := headerHeight + footerHeight + helpMenuHeight
+	verticalMarginHeight := headerHeight
 	lo.viewport = viewport.New(Width, Height-verticalMarginHeight)
 	lo.viewport.YPosition = headerHeight
 	lo.viewport.HighPerformanceRendering = false
@@ -243,12 +242,8 @@ func (lo *liveoutput) initViewport() {
 }
 
 func (m liveoutput) headerView() string {
-	title := titleStyle.Render(m.commandDisplayName)
-	line := strings.Repeat("─", max(0, Width-lipgloss.Width(title)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
-}
+	cmdDisplay := titleStyle.Render(m.commandDisplayName)
 
-func (m liveoutput) footerView() string {
 	var message string
 	if m.finished {
 		message = "Finished"
@@ -257,8 +252,8 @@ func (m liveoutput) footerView() string {
 	}
 	message += " - " + m.runtime.View()
 	info := infoStyle.Render(message)
-	line := strings.Repeat("─", max(0, Width-lipgloss.Width(info)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, info, line)
+	line := strings.Repeat("─", max(0, Width-lipgloss.Width(cmdDisplay)-lipgloss.Width(info)))
+	return lipgloss.JoinHorizontal(lipgloss.Center, cmdDisplay, line, info)
 }
 
 func max(a, b int) int {

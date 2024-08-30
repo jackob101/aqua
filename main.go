@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"jackob101/run/common"
+	"jackob101/run/widgets"
 	"log/slog"
 	"os"
 	"reflect"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var (
@@ -15,76 +17,75 @@ var (
 	Height int = 0
 )
 
-type MainView struct {
-	commandList *CommandList
-	lo          *liveoutput
+type Root struct {
+	content         MainView
+	keybinds        []common.Keybind
+	keybindsDisplay widgets.KeybindDisplay
 }
 
-func initialModel() MainView {
-	list := NewCommandList()
-	return MainView{
-		commandList: &list,
+func (m Root) handleKeybind(msg tea.KeyMsg) tea.Msg {
+	for _, keybindE := range m.keybinds {
+		for _, keyE := range keybindE.Keys {
+			if keyE == msg.String() {
+				if keybindE.Msg == nil {
+					return msg
+				}
+				return keybindE.Msg
+			}
+		}
 	}
+	return msg
 }
 
-func (m MainView) Init() tea.Cmd {
-	return nil
+func (m Root) Init() tea.Cmd {
+	return m.content.Init()
 }
 
-func (m MainView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	slog.Debug("Message",
 		"Type", reflect.TypeOf(msg),
 		"Value", fmt.Sprintf("%+v", msg))
 	cmds := []tea.Cmd{}
 
 	switch msg := msg.(type) {
-	case common.SelectedCommandEntry:
-		{
-			m.commandList = nil
-			lo := NewLiveoutput(msg.Cmd, msg.DisplayName)
-			m.lo = &lo
-			return m, m.lo.Init()
-		}
+	case common.SetKeybinds:
+		m.keybinds = msg.Keybinds
+		m.keybindsDisplay, _ = m.keybindsDisplay.Update(msg)
+		return m, nil
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			{
-				return m, tea.Quit
-			}
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		mappedMessage := m.handleKeybind(msg)
+		switch mappedMessage.(type) {
+		case tea.KeyMsg:
+		default:
+			return m, wrapMsg(mappedMessage)
 		}
 	case tea.WindowSizeMsg:
 		Width = msg.Width
-		Height = msg.Height
-	case loClosed:
-		m.lo = nil
-		newCommandList := NewCommandList()
-		// cmds = append(cmds, newCommandList.Init())
-		m.commandList = &newCommandList
+		Height = msg.Height - lipgloss.Height(m.keybindsDisplay.View())
+
+		return m, wrapMsg(common.ContentSectionResize{
+			Width:  Width,
+			Height: Height,
+		})
 	}
 
-	if m.commandList != nil {
-		mResp, cmd := m.commandList.Update(msg)
-		typedMResp := mResp.(CommandList)
-		m.commandList = &typedMResp
-		cmds = append(cmds, cmd)
-	}
+	var cmd tea.Cmd
+	m.content, cmd = m.content.Update(msg)
+	cmds = append(cmds, cmd)
 
-	if m.lo != nil {
-		lo, cmd := m.lo.Update(msg)
-		m.lo = &lo
-		cmds = append(cmds, cmd)
-	}
+	m.keybindsDisplay, cmd = m.keybindsDisplay.Update(msg)
+	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
 }
 
-func (m MainView) View() string {
-	if m.commandList != nil {
-		return m.commandList.View()
-	} else if m.lo != nil {
-		return m.lo.View()
-	}
-	return "Missing output"
+func (m Root) View() string {
+	keybindsDisplayView := m.keybindsDisplay.View()
+	contentView := m.content.View()
+	return lipgloss.JoinVertical(0, contentView, keybindsDisplayView)
 }
 
 func wrapMsg(msg tea.Msg) tea.Cmd {
@@ -103,7 +104,13 @@ func main() {
 	logginLevel.Set(slog.LevelDebug)
 	slog.Info("Logger configured")
 
-	p := tea.NewProgram(initialModel(),
+	root := Root{
+		content:         initialModel(),
+		keybinds:        []common.Keybind{},
+		keybindsDisplay: widgets.KeybindDisplay{},
+	}
+
+	p := tea.NewProgram(root,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)

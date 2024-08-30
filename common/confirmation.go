@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -40,6 +41,14 @@ var (
 	}()
 )
 
+var confirmationKeybinds = []Keybind{
+	NewKeybind(ConfirmationDialogLeft{}, "Left", "left", "h"),
+	NewKeybind(ConfirmationDialogRight{}, "Right", "right", "l"),
+	NewKeybind(ConfirmationDialogSelect{}, "Select", "enter"),
+}
+
+// TODO: These keybinds are kinda annoying. Should decide if keybinds should be always shown at
+// the bottom of the screen like in zellij.
 type ConfirmationKeybinds struct {
 	Left   key.Binding
 	Right  key.Binding
@@ -69,24 +78,18 @@ func NewConfirmation(message string, width int, height int) Confirmation {
 }
 
 func (m Confirmation) Init() tea.Cmd {
-	return nil
+	slog.Info("Init")
+	return SetKeybindsCmd(confirmationKeybinds)
 }
 
 func (m Confirmation) Update(msg tea.Msg) (Confirmation, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, keybinds.Right):
-			m.selected = false
-		case key.Matches(msg, keybinds.Left):
-			m.selected = true
-		case key.Matches(msg, keybinds.Accept):
-			return m, func() tea.Msg {
-				return Confirmation_Selected{
-					Selected: m.selected,
-				}
-			}
-		}
+	case ConfirmationDialogLeft:
+		m.selected = true
+	case ConfirmationDialogRight:
+		m.selected = false
+	case ConfirmationDialogSelect:
+		return m, MakeCmd(ConfirmationDialogSelected{Value: m.selected})
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height

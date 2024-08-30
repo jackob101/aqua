@@ -1,5 +1,11 @@
 package common
 
+import (
+	"jackob101/run/common/dto"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
 type SelectedCommandEntry struct {
 	Cmd         string
 	Description string
@@ -8,8 +14,61 @@ type SelectedCommandEntry struct {
 
 type LoadViewport struct{}
 
-type Liveoutput_Quit struct{}
+type ContentSectionResize struct {
+	Width  int
+	Height int
+}
 
-type Confirmation_Selected struct {
-	Selected bool
+// Command list
+
+type (
+	CommandListDown     struct{}
+	CommandListUp       struct{}
+	CommandListQuit     struct{}
+	CommandListFilter   struct{}
+	CommandListSelect   struct{}
+	CommandListSelected struct {
+		Cmd dto.Command
+	}
+)
+
+type (
+	LiveoutputClose           struct{}
+	LiveoutputClosed          struct{}
+	LiveoutputCommandFinished struct{}
+	LiveoutputCommandStop     struct{}
+	LiveoutputCommandRestart  struct{}
+)
+
+type (
+	ConfirmationDialogLeft     struct{}
+	ConfirmationDialogRight    struct{}
+	ConfirmationDialogSelect   struct{}
+	ConfirmationDialogSelected struct {
+		Value bool
+	}
+)
+
+type SetKeybinds struct {
+	Keybinds []Keybind
+}
+
+func SetKeybindsCmd(keybinds []Keybind) tea.Cmd {
+	return MakeCmd(SetKeybinds{
+		Keybinds: keybinds,
+	})
+}
+
+type Keybind struct {
+	Keys        []string
+	Description string
+	Msg         tea.Msg
+}
+
+func NewKeybind(msg tea.Msg, description string, keys ...string) Keybind {
+	return Keybind{
+		Keys:        keys,
+		Description: description,
+		Msg:         msg,
+	}
 }
