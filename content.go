@@ -3,7 +3,6 @@ package main
 import (
 	"jackob101/run/common"
 	"jackob101/run/widgets"
-	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -42,7 +41,6 @@ func (m MainView) Update(msg tea.Msg) (MainView, tea.Cmd) {
 		return m, m.lo.Init()
 	case common.LiveoutputClosed:
 		m.lo = nil
-		slog.Info("Content size", "Width", Width, "Height", Height)
 		cmdList := widgets.NewCommandList(Width, Height)
 		m.commandList = &cmdList
 		cmds = append(cmds, cmdList.Init())

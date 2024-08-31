@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"jackob101/run/common"
 	"jackob101/run/styles"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"time"
@@ -39,6 +40,8 @@ func (m liveoutput) getLiveoutputKeybinds() []common.Keybind {
 	liveoutputKeybinds := []common.Keybind{
 		common.NewKeybind(common.LiveoutputClose{}, "close", "esc"),
 		common.NewKeybind(common.LiveoutputToggleDetails{}, "toggle details", "d"),
+		common.NewKeybind(nil, "scroll up", "up", "k"),
+		common.NewKeybind(nil, "scroll down", "down", "j"),
 	}
 
 	if m.finished {
@@ -71,12 +74,11 @@ type newline struct {
 	content string
 }
 
-// TODO: This is not killing the command... But is should!
 func (m liveoutput) listenForNewline() tea.Cmd {
 	return func() tea.Msg {
 		cmd := exec.Command("bash", "-c", m.command)
 		stdout, _ := cmd.StdoutPipe()
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		err := cmd.Start()
 		if err != nil {
 			m.commandOutputChannel <- err.Error()
@@ -87,6 +89,11 @@ func (m liveoutput) listenForNewline() tea.Cmd {
 			select {
 			case value := <-m.commandStopChannel:
 				if value {
+					if cmd.Cancel != nil {
+						if err := cmd.Cancel(); err != nil {
+							slog.Error("I'am too stupid to handle this error", "value", err.Error())
+						}
+					}
 					return common.LiveoutputCommandFinished{}
 				}
 			default:
@@ -114,9 +121,11 @@ func (m *liveoutput) stopCommand() tea.Cmd {
 	default:
 	}
 
-	return tea.Batch(m.runtime.Stop(),
-		common.SetKeybindsCmd(m.getLiveoutputKeybinds()),
-	)
+	return m.runtime.Stop()
+}
+
+func (m *liveoutput) refreshKeybinds() tea.Cmd {
+	return common.SetKeybindsCmd(m.getLiveoutputKeybinds())
 }
 
 func (m *liveoutput) restartCommand() tea.Cmd {
@@ -193,6 +202,7 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		cmds = append(cmds, m.restartCommand())
 	case common.LiveoutputCommandStop:
 		cmds = append(cmds, m.stopCommand())
+		cmds = append(cmds, m.refreshKeybinds())
 	case common.LiveoutputToggleDetails:
 		m.showDetails = !m.showDetails
 		detailsHeight := m.getDetailsViewHeight()
@@ -205,7 +215,7 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 				cmds = append(cmds, common.MakeCmd(common.LiveoutputClosed{}))
 			} else {
 				m.closeConfirmation = nil
-				cmds = append(cmds, common.SetKeybindsCmd(m.getLiveoutputKeybinds()))
+				cmds = append(cmds, m.refreshKeybinds())
 			}
 		}
 
