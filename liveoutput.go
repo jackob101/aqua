@@ -17,6 +17,11 @@ import (
 )
 
 var (
+	detailsValueStyle = lipgloss.NewStyle().
+				Faint(true)
+	detailsKeyNameStyle = lipgloss.NewStyle().
+				PaddingLeft(1).
+				Bold(true)
 	titleStyle = func() lipgloss.Style {
 		b := lipgloss.NormalBorder()
 		b.Right = "├"
@@ -33,6 +38,7 @@ var (
 func (m liveoutput) getLiveoutputKeybinds() []common.Keybind {
 	liveoutputKeybinds := []common.Keybind{
 		common.NewKeybind(common.LiveoutputClose{}, "close", "esc"),
+		common.NewKeybind(common.LiveoutputToggleDetails{}, "toggle details", "d"),
 	}
 
 	if m.finished {
@@ -58,6 +64,7 @@ type liveoutput struct {
 	helpMenu             help.Model
 	runtime              stopwatch.Model
 	closeConfirmation    *common.Confirmation
+	showDetails          bool
 }
 
 type newline struct {
@@ -141,6 +148,7 @@ func NewLiveoutput(cmd string, displayName string) liveoutput {
 		viewport:             viewport.Model{},
 		helpMenu:             helpMenu,
 		runtime:              stopwatch.New(),
+		showDetails:          true,
 	}
 }
 
@@ -185,6 +193,10 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		cmds = append(cmds, m.restartCommand())
 	case common.LiveoutputCommandStop:
 		cmds = append(cmds, m.stopCommand())
+	case common.LiveoutputToggleDetails:
+		m.showDetails = !m.showDetails
+		detailsHeight := m.getDetailsViewHeight()
+		m.viewport.Height = Height - detailsHeight
 	case common.ConfirmationDialogSelected:
 		if m.closeConfirmation != nil {
 			m.closeConfirmation = nil
@@ -222,43 +234,58 @@ func (m liveoutput) View() string {
 	} else {
 		mainBody = m.viewport.View()
 	}
-	return fmt.Sprintf("%s\n%s",
-		m.headerView(),
-		mainBody,
-		// styles.MenuStyle().Render(m.helpMenu.View(keybinds)),
-	)
+
+	if m.showDetails {
+		return fmt.Sprintf("%s\n%s",
+			m.detailsView(),
+			mainBody,
+		)
+	} else {
+		return mainBody
+	}
+}
+
+func (m liveoutput) getDetailsViewHeight() int {
+	if m.showDetails {
+		return lipgloss.Height(m.detailsView())
+	} else {
+		return 0
+	}
 }
 
 func (lo *liveoutput) initViewport() {
-	// helpMenuHeight := lipgloss.Height(styles.MenuStyle().Render(lo.helpMenu.View(keybinds)))
-	headerHeight := lipgloss.Height(lo.headerView())
-	verticalMarginHeight := headerHeight
-	lo.viewport = viewport.New(Width, Height-verticalMarginHeight)
-	lo.viewport.YPosition = headerHeight
-	lo.viewport.HighPerformanceRendering = false
+	detailsHeight := lo.getDetailsViewHeight()
+	lo.viewport = viewport.New(Width, Height-detailsHeight)
 	lo.viewport.SetContent(lo.lines)
-
-	lo.viewport.YPosition = headerHeight + 1
 }
 
-func (m liveoutput) headerView() string {
-	cmdDisplay := titleStyle.Render(m.commandDisplayName)
-
-	var message string
+func (m liveoutput) getStatus() string {
 	if m.finished {
-		message = "Finished"
+		return "Finished"
 	} else {
-		message = "Running"
+		return "Running"
 	}
-	message += " - " + m.runtime.View()
-	info := infoStyle.Render(message)
-	line := strings.Repeat("─", max(0, Width-lipgloss.Width(cmdDisplay)-lipgloss.Width(info)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, cmdDisplay, line, info)
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
+func (m liveoutput) detailsView() string {
+	cmdTitleKey := "Command name: "
+	cmdTitleValue := m.commandDisplayName
+	cmdKey := "Command: "
+	cmdValue := m.command
+	statusKey := "Status: "
+	statusValue := m.getStatus()
+	timeKey := "Time: "
+	timeValue := m.runtime.View()
+
+	details := []string{
+		lipgloss.JoinHorizontal(0, detailsKeyNameStyle.Render(cmdTitleKey), detailsValueStyle.Render(cmdTitleValue)),
+		lipgloss.JoinHorizontal(0, detailsKeyNameStyle.Render(cmdKey), detailsValueStyle.Render(cmdValue)),
+		lipgloss.JoinHorizontal(0, detailsKeyNameStyle.Render(statusKey), detailsValueStyle.Render(statusValue)),
+		lipgloss.JoinHorizontal(0, detailsKeyNameStyle.Render(timeKey), detailsValueStyle.Render(timeValue)),
 	}
-	return b
+
+	detailView := lipgloss.JoinVertical(0, details...)
+
+	separator := strings.Repeat("─", Width)
+	return lipgloss.JoinVertical(0, detailView, separator)
 }

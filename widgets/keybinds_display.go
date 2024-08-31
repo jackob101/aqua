@@ -2,20 +2,15 @@ package widgets
 
 import (
 	"jackob101/run/common"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	keybindsDisplaySeparatorStyle = func() lipgloss.Border {
-		b := lipgloss.NormalBorder()
-		b.Top = "̅─"
-		return b
-	}
 	keybindsDisplayBoxStyle = lipgloss.NewStyle().
-				Padding(0, 1, 1, 1).
-				Border(keybindsDisplaySeparatorStyle(), true, false, false, false)
+				Padding(0, 1, 1, 1)
 
 	keybindsDisplayDescriptionStyle = lipgloss.NewStyle().
 					Faint(true)
@@ -57,5 +52,8 @@ func (m KeybindDisplay) View() string {
 			keybindsDisplayView += " · " + keys + " " + keybindsDisplayDescriptionStyle.Render(e.Description)
 		}
 	}
-	return keybindsDisplayBoxStyle.Width(m.width).Render(keybindsDisplayView)
+
+	return lipgloss.JoinVertical(0, strings.Repeat("─", m.width),
+		keybindsDisplayBoxStyle.Width(m.width).Render(keybindsDisplayView),
+	)
 }
