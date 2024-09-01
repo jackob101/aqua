@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"jackob101/run/common"
 	"jackob101/run/common/dto"
-	"log/slog"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -264,7 +263,6 @@ func (m CommandList) Update(msg tea.Msg) (CommandList, tea.Cmd) {
 		m.filtering = !m.filtering
 		cmds = append(cmds, common.SetKeybindsCmd(m.getKeybinds()))
 	case common.ContentSectionResize:
-		slog.Info("content resize ", "Width", msg.Width, "Height", msg.Height)
 		m.width = msg.Width - (commandListHorizontalMargin * 2)
 		m.height = msg.Height - (commandListVerticalMargin * 2)
 	}
@@ -276,12 +274,6 @@ func (m CommandList) View() string {
 	headerView := m.headerView()
 	currentTotalView := m.currentTotalView()
 	listView := m.commandListView(m.height - lipgloss.Height(headerView) - lipgloss.Height(currentTotalView))
-
-	slog.Info("Allowed height", "value", m.height)
-	slog.Info("command_list height", "value", lipgloss.Height(headerView)+lipgloss.Height(listView)+lipgloss.Height(currentTotalView))
-	slog.Info("Heights", "headerView", lipgloss.Height(headerView),
-		"currentTotalView", lipgloss.Height(currentTotalView),
-		"listView", lipgloss.Height(listView))
 
 	return commandListStyle.Render(lipgloss.JoinVertical(0, headerView, listView, currentTotalView))
 }

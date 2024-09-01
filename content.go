@@ -51,11 +51,9 @@ func (m MainView) Update(msg tea.Msg) (MainView, tea.Cmd) {
 	case common.ContentSectionResize:
 		m.contentAllowedWidth = msgi.Width
 		m.contentAllowedHeight = msgi.Height
-		slog.Info("Dimensions update", "width", m.contentAllowedWidth, "height", m.contentAllowedHeight)
 	}
 
 	if m.commandList != nil {
-		slog.Info("content resize before cmd list", "Value", msg)
 		mResp, cmd := m.commandList.Update(msg)
 		m.commandList = &mResp
 		cmds = append(cmds, cmd)
