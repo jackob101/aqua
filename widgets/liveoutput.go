@@ -1,4 +1,4 @@
-package main
+package widgets
 
 import (
 	"bufio"
@@ -68,6 +68,8 @@ type liveoutput struct {
 	runtime              stopwatch.Model
 	closeConfirmation    *common.Confirmation
 	showDetails          bool
+	width                int
+	height               int
 }
 
 type newline struct {
@@ -144,7 +146,7 @@ func (m *liveoutput) restartCommand() tea.Cmd {
 	return nil
 }
 
-func NewLiveoutput(cmd string, displayName string) liveoutput {
+func NewLiveoutput(cmd string, displayName string, width int, height int) liveoutput {
 	helpMenu := help.New()
 	helpMenu.Styles = styles.MenuStyles
 	return liveoutput{
@@ -158,13 +160,15 @@ func NewLiveoutput(cmd string, displayName string) liveoutput {
 		helpMenu:             helpMenu,
 		runtime:              stopwatch.New(),
 		showDetails:          true,
+		width:                width,
+		height:               height,
 	}
 }
 
 func (m liveoutput) Init() tea.Cmd {
 	return tea.Batch(m.listenForNewline(),
 		m.waitForNewline(),
-		wrapMsg(common.LoadViewport{}),
+		common.MakeCmd(common.LoadViewport{}),
 		m.runtime.Init(),
 		common.MakeCmd(common.SetKeybinds{Keybinds: m.getLiveoutputKeybinds()}),
 	)
@@ -189,12 +193,14 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	case common.LoadViewport:
 		m.initViewport()
 	case common.ContentSectionResize:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.initViewport()
 		cmds = append(cmds, viewport.Sync(m.viewport))
 	case common.LiveoutputClose:
 		confirmationDialogHeight := lipgloss.Height(m.viewport.View())
 		confirmationDialog := common.NewConfirmation("Do You want to close liveouput?",
-			Width,
+			m.width,
 			confirmationDialogHeight)
 		m.closeConfirmation = &confirmationDialog
 		cmds = append(cmds, confirmationDialog.Init())
@@ -206,7 +212,7 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	case common.LiveoutputToggleDetails:
 		m.showDetails = !m.showDetails
 		detailsHeight := m.getDetailsViewHeight()
-		m.viewport.Height = Height - detailsHeight
+		m.viewport.Height = m.height - detailsHeight
 	case common.ConfirmationDialogSelected:
 		if m.closeConfirmation != nil {
 			m.closeConfirmation = nil
@@ -263,10 +269,10 @@ func (m liveoutput) getDetailsViewHeight() int {
 	}
 }
 
-func (lo *liveoutput) initViewport() {
-	detailsHeight := lo.getDetailsViewHeight()
-	lo.viewport = viewport.New(Width, Height-detailsHeight)
-	lo.viewport.SetContent(lo.lines)
+func (m *liveoutput) initViewport() {
+	detailsHeight := m.getDetailsViewHeight()
+	m.viewport = viewport.New(m.width, m.height-detailsHeight)
+	m.viewport.SetContent(m.lines)
 }
 
 func (m liveoutput) getStatus() string {
@@ -296,6 +302,6 @@ func (m liveoutput) detailsView() string {
 
 	detailView := lipgloss.JoinVertical(0, details...)
 
-	separator := strings.Repeat("─", Width)
+	separator := strings.Repeat("─", m.width)
 	return lipgloss.JoinVertical(0, detailView, separator)
 }

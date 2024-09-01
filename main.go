@@ -18,7 +18,7 @@ var (
 )
 
 type Root struct {
-	content         MainView
+	content         widgets.MainView
 	keybinds        []common.Keybind
 	keybindsDisplay widgets.KeybindDisplay
 }
@@ -105,7 +105,7 @@ func main() {
 	slog.Info("Logger configured")
 
 	root := Root{
-		content:         initialModel(),
+		content:         widgets.NewContentPane(Width, Height),
 		keybinds:        []common.Keybind{},
 		keybindsDisplay: widgets.KeybindDisplay{},
 	}

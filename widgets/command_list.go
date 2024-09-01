@@ -34,21 +34,23 @@ var (
 			Height(height).
 			Width(width)
 	}
-	selectedArrow = func() lipgloss.Border {
-		b := lipgloss.NormalBorder()
-		b.Right = "┃"
-		return b
-	}()
 	entryDescriptionStyle = lipgloss.NewStyle().
 				MarginLeft(4).
 				Faint(true)
 	entryContainerStyle = lipgloss.NewStyle().
 				PaddingBottom(1)
-	selectedEntryStyle = lipgloss.NewStyle().
-				Border(selectedArrow, false, false, false, true).
-				Foreground(lipgloss.Color("#a9b665"))
+	selectedArrow = func() lipgloss.Border {
+		b := lipgloss.NormalBorder()
+		b.Right = "┃"
+		return b
+	}()
 	entryStyle = lipgloss.NewStyle().
 			Margin(0, 0, 0, 1)
+	selectedEntryStyle = lipgloss.NewStyle().
+				Inherit(entryStyle).
+				Border(selectedArrow, false, false, false, true).
+				UnsetMargins().
+				Foreground(lipgloss.Color("#a9b665"))
 )
 
 type CommandList struct {
@@ -194,7 +196,7 @@ func (m *CommandList) prev() {
 
 func (m CommandList) getSelected() tea.Msg {
 	return common.CommandListSelected{
-		Cmd: m.cmds[m.selected],
+		Cmd: m.filtered[m.selected],
 	}
 }
 
@@ -206,7 +208,6 @@ func (m *CommandList) goToTop() {
 func (m CommandList) getKeybinds() []common.Keybind {
 	if m.filtering {
 		return []common.Keybind{
-			// common.NewKeybind(common.CommandListSelect{}, "select", "enter"),
 			common.NewKeybind(common.CommandListFilterToggle{}, "accept filter", "enter", "esc"),
 		}
 	} else {

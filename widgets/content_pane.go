@@ -1,23 +1,20 @@
-package main
+package widgets
 
 import (
 	"jackob101/run/common"
-	"jackob101/run/widgets"
-	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type MainView struct {
-	commandList          *widgets.CommandList
-	contentAllowedWidth  int
-	contentAllowedHeight int
-	lo                   *liveoutput
+	commandList *CommandList
+	width       int
+	height      int
+	lo          *liveoutput
 }
 
-func initialModel() MainView {
-	list := widgets.NewCommandList(Width, Height)
-	slog.Info("Dimensions init", "width", Width, "height", Height)
+func NewContentPane(width int, height int) MainView {
+	list := NewCommandList(width, height)
 	return MainView{
 		commandList: &list,
 	}
@@ -34,23 +31,23 @@ func (m MainView) Update(msg tea.Msg) (MainView, tea.Cmd) {
 	case common.SelectedCommandEntry:
 		{
 			m.commandList = nil
-			lo := NewLiveoutput(msgi.Cmd, msgi.DisplayName)
+			lo := NewLiveoutput(msgi.Cmd, msgi.DisplayName, m.width, m.height)
 			m.lo = &lo
 			return m, m.lo.Init()
 		}
 	case common.CommandListSelected:
 		m.commandList = nil
-		lo := NewLiveoutput(msgi.Cmd.Cmd, msgi.Cmd.Title)
+		lo := NewLiveoutput(msgi.Cmd.Cmd, msgi.Cmd.Title, m.width, m.height)
 		m.lo = &lo
 		return m, m.lo.Init()
 	case common.LiveoutputClosed:
 		m.lo = nil
-		cmdList := widgets.NewCommandList(m.contentAllowedWidth, m.contentAllowedHeight)
+		cmdList := NewCommandList(m.width, m.height)
 		m.commandList = &cmdList
 		cmds = append(cmds, cmdList.Init())
 	case common.ContentSectionResize:
-		m.contentAllowedWidth = msgi.Width
-		m.contentAllowedHeight = msgi.Height
+		m.width = msgi.Width
+		m.height = msgi.Height
 	}
 
 	if m.commandList != nil {
