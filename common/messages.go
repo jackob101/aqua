@@ -22,12 +22,13 @@ type ContentSectionResize struct {
 // Command list
 
 type (
-	CommandListDown     struct{}
-	CommandListUp       struct{}
-	CommandListQuit     struct{}
-	CommandListFilter   struct{}
-	CommandListSelect   struct{}
-	CommandListSelected struct {
+	CommandListDown         struct{}
+	CommandListUp           struct{}
+	CommandListQuit         struct{}
+	CommandListFilter       struct{}
+	CommandListSelect       struct{}
+	CommandListFilterToggle struct{}
+	CommandListSelected     struct {
 		Cmd dto.Command
 	}
 )
