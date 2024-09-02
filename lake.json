@@ -1,0 +1,18 @@
+[
+  {
+    "cmd": "echo \"Starting application...\"",
+    "title": "Start app"
+  },
+  {
+    "cmd": "echo \"Restarting application\"",
+    "title": "Restart app"
+  },
+  {
+    "cmd": "echo \"Stopping application\"",
+    "title": "Stop app"
+  },
+  {
+    "cmd": "echo \"Debuggins application\"",
+    "title": "Debug app"
+  }
+]

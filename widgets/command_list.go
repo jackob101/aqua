@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"jackob101/run/common"
 	"jackob101/run/common/dto"
+	"jackob101/run/internal"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -65,110 +67,23 @@ type CommandList struct {
 }
 
 func NewCommandList(width int, height int) CommandList {
-	items := []dto.Command{
-		{
-			Cmd:   "echo Test from run",
-			Title: "This is test command",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 2",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 3",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 4",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 5",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 6",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 7",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 8",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 9 filtering test",
-		},
-		{
-			Cmd:   "This is test command 10 This is some very very long title that should't fit whole into the list so it should be cut",
-			Title: "This is test command 10 This is some very very long title that should't fit whole into the list so it should be cut ",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 11",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 12",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 13",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 14",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 15",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 16",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 17",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 18",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 19",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 20",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 21",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 22",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 23",
-		},
-		{
-			Cmd:   "./test.sh",
-			Title: "This is test command 24",
-		},
-	}
-
 	return CommandList{
-		filtered: items,
-		cmds:     items,
+		filtered: []dto.Command{},
+		cmds:     []dto.Command{},
 		width:    max(width-(commandListHorizontalMargin*2), 0),
 		height:   max(height-(commandListVerticalMargin*2), 0),
+	}
+}
+
+func (m CommandList) loadCommands() tea.Msg {
+	commands, err := internal.ReadCommands()
+	if err != nil {
+		// TODO: Add handling to this. Just using os.Exit is "kinda" bad
+		println(err.Error())
+		os.Exit(1)
+	}
+	return common.LoadedCommands{
+		Cmds: commands,
 	}
 }
 
@@ -222,14 +137,17 @@ func (m CommandList) getKeybinds() []common.Keybind {
 }
 
 func (m CommandList) Init() tea.Cmd {
-	return common.MakeCmd(common.SetKeybinds{
-		Keybinds: m.getKeybinds(),
-	})
+	return tea.Batch(
+		common.MakeCmd(common.SetKeybinds{Keybinds: m.getKeybinds()}),
+		m.loadCommands)
 }
 
 func (m CommandList) Update(msg tea.Msg) (CommandList, tea.Cmd) {
 	cmds := []tea.Cmd{}
 	switch msg := msg.(type) {
+	case common.LoadedCommands:
+		m.cmds = msg.Cmds
+		m.filtered = msg.Cmds
 	case tea.KeyMsg:
 		if m.filtering {
 			switch msg.Type {

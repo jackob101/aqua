@@ -1,6 +1,6 @@
 package dto
 
 type Command struct {
-	Cmd   string
-	Title string
+	Cmd   string `json:"cmd"`
+	Title string `json:"title"`
 }

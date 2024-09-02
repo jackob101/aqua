@@ -19,6 +19,12 @@ type ContentSectionResize struct {
 	Height int
 }
 
+type (
+	LoadedCommands struct {
+		Cmds []dto.Command
+	}
+)
+
 // Command list
 
 type (
