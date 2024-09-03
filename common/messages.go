@@ -23,6 +23,9 @@ type (
 	LoadedCommands struct {
 		Cmds []dto.Command
 	}
+	ShowErrorScreen struct {
+		Err error
+	}
 )
 
 // Command list

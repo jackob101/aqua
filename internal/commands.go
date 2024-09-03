@@ -10,6 +10,7 @@ import (
 	"path"
 )
 
+// TODO: This also should be read from env variables
 var (
 	commandFilename     = "lake.json"
 	howFarUpShouldCheck = 3
@@ -53,7 +54,7 @@ func ReadCommands() ([]dto.Command, error) {
 		}
 	}
 	if commandFile == nil {
-		return nil, nil
+		return nil, errors.New("lake.json is missing")
 	}
 	var content []byte
 	content, err = os.ReadFile(path.Join(dir, commandFile.Name()))

@@ -5,7 +5,6 @@ import (
 	"jackob101/run/common"
 	"jackob101/run/common/dto"
 	"jackob101/run/internal"
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -78,9 +77,9 @@ func NewCommandList(width int, height int) CommandList {
 func (m CommandList) loadCommands() tea.Msg {
 	commands, err := internal.ReadCommands()
 	if err != nil {
-		// TODO: Add handling to this. Just using os.Exit is "kinda" bad
-		println(err.Error())
-		os.Exit(1)
+		return common.ShowErrorScreen{
+			Err: err,
+		}
 	}
 	return common.LoadedCommands{
 		Cmds: commands,
