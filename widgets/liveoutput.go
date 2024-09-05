@@ -7,6 +7,7 @@ import (
 	"jackob101/run/styles"
 	"log/slog"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 )
 
 var (
+	gutterStyle = lipgloss.NewStyle().
+			MarginRight(1).
+			Faint(true)
 	detailsValueStyle = lipgloss.NewStyle().
 				Faint(true)
 	detailsKeyNameStyle = lipgloss.NewStyle().
@@ -40,8 +44,8 @@ func (m liveoutput) getLiveoutputKeybinds() []common.Keybind {
 	liveoutputKeybinds := []common.Keybind{
 		common.NewKeybind(common.LiveoutputClose{}, "close", "esc"),
 		common.NewKeybind(common.LiveoutputToggleDetails{}, "toggle details", "d"),
-		common.NewKeybind(nil, "scroll up", "up", "k"),
-		common.NewKeybind(nil, "scroll down", "down", "j"),
+		common.NewKeybind(common.LiveoutputUp{}, "scroll up", "up", "k"),
+		common.NewKeybind(common.LiveoutputDown{}, "scroll down", "down", "j"),
 	}
 
 	if m.finished {
@@ -65,6 +69,8 @@ type liveoutput struct {
 	lineCount            int
 	finished             bool
 	viewport             viewport.Model
+	viewportOffset       int
+	viewportHeight       int
 	helpMenu             help.Model
 	runtime              stopwatch.Model
 	closeConfirmation    *common.Confirmation
@@ -150,7 +156,7 @@ func (m *liveoutput) restartCommand() tea.Cmd {
 func NewLiveoutput(cmd string, displayName string, width int, height int) liveoutput {
 	helpMenu := help.New()
 	helpMenu.Styles = styles.MenuStyles
-	return liveoutput{
+	lo := liveoutput{
 		commandOutputChannel: make(chan string),
 		commandStopChannel:   make(chan bool, 1),
 		commandDisplayName:   displayName,
@@ -165,6 +171,8 @@ func NewLiveoutput(cmd string, displayName string, width int, height int) liveou
 		width:                width,
 		height:               height,
 	}
+	lo.viewportHeight = lo.height - lo.getDetailsViewHeight()
+	return lo
 }
 
 func (m liveoutput) Init() tea.Cmd {
@@ -181,11 +189,13 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case newline:
-		// m.lines = append(m.lines, fmt.Sprintf("%d  %s", m.lineCount, msg.content))
-		// m.lineCount++
+		msg.content = strings.ReplaceAll(msg.content, "\\r\\n", "")
+		if len(m.lines) >= m.height {
+			m.viewportOffset++
+		}
 		m.lines = append(m.lines, msg.content)
-		m.viewport.SetContent(strings.Join(m.lines, "\n"))
-		m.viewport.GotoBottom()
+		// m.viewport.SetContent(strings.Join(m.lines, "\n"))
+		// m.viewport.GotoBottom()
 		cmds = append(cmds, m.waitForNewline())
 	case common.LiveoutputCommandFinished:
 		m.finished = true
@@ -214,6 +224,14 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		m.showDetails = !m.showDetails
 		detailsHeight := m.getDetailsViewHeight()
 		m.viewport.Height = m.height - detailsHeight
+		m.viewportHeight = m.height - detailsHeight
+	case common.LiveoutputUp:
+		m.viewportOffset = max(m.viewportOffset-1, 0)
+	case common.LiveoutputDown:
+		m.viewportOffset = min(m.viewportOffset+1, len(m.lines)-m.viewportHeight)
+		if m.viewportOffset < 0 {
+			m.viewportOffset = 0
+		}
 	case common.ConfirmationDialogSelected:
 		if m.closeConfirmation != nil {
 			m.closeConfirmation = nil
@@ -249,7 +267,11 @@ func (m liveoutput) View() string {
 	if m.closeConfirmation != nil {
 		mainBody = m.closeConfirmation.View()
 	} else {
-		mainBody = m.viewport.View()
+		// mainBody = m.viewport.View()
+		mainBody = lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.viewportHeight).
+			Render(m.viewportView())
 	}
 
 	if m.showDetails {
@@ -282,6 +304,45 @@ func (m liveoutput) getStatus() string {
 	} else {
 		return "Running"
 	}
+}
+
+func (m liveoutput) viewportView() string {
+	lines := []string{}
+	if len(m.lines) < m.viewportHeight {
+		lines = append(lines, m.lines...)
+	} else {
+		appendedLines := 0
+		for _, e := range m.lines[m.viewportOffset:] {
+			if appendedLines > m.viewportHeight {
+				break
+			}
+			lineWidth := lipgloss.Width(e)
+			if lineWidth >= m.width {
+				chunkSize := m.width - 20
+				for i := 0; i < lipgloss.Width(e); i += chunkSize {
+					if appendedLines > m.viewportHeight {
+						break
+					}
+					part := e[i:min(lineWidth, i+chunkSize)]
+					lines = append(lines, part)
+					appendedLines++
+				}
+			} else {
+				lines = append(lines, e)
+				appendedLines++
+			}
+		}
+	}
+
+	gutterNumberCount := strconv.Itoa(len(m.lines))
+
+	result := ""
+	for i, e := range lines {
+		gutter := gutterStyle.Width(len(gutterNumberCount)).Render(strconv.Itoa(i + m.viewportOffset))
+		result += gutter + e + "\n"
+	}
+
+	return result
 }
 
 func (m liveoutput) detailsView() string {

@@ -49,6 +49,8 @@ type (
 	LiveoutputCommandStop     struct{}
 	LiveoutputCommandRestart  struct{}
 	LiveoutputToggleDetails   struct{}
+	LiveoutputUp              struct{}
+	LiveoutputDown            struct{}
 )
 
 type (
