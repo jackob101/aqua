@@ -14,5 +14,9 @@
   {
     "cmd": "echo \"Debuggins application\"",
     "title": "Debug app"
+  },
+  {
+    "cmd": "./test.sh",
+    "title": "Long command"
   }
 ]

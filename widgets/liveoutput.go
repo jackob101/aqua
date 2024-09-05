@@ -61,7 +61,8 @@ type liveoutput struct {
 	commandStopChannel   chan bool
 	commandDisplayName   string
 	command              string
-	lines                string
+	lines                []string
+	lineCount            int
 	finished             bool
 	viewport             viewport.Model
 	helpMenu             help.Model
@@ -132,10 +133,10 @@ func (m *liveoutput) refreshKeybinds() tea.Cmd {
 
 func (m *liveoutput) restartCommand() tea.Cmd {
 	if m.finished {
-		m.lines = ""
+		m.lines = []string{}
 		m.commandOutputChannel = make(chan string)
 		m.finished = false
-		m.viewport.SetContent(m.lines)
+		m.viewport.SetContent(strings.Join(m.lines, "\n"))
 		return tea.Batch(m.listenForNewline(),
 			m.waitForNewline(),
 			m.runtime.Reset(),
@@ -154,7 +155,8 @@ func NewLiveoutput(cmd string, displayName string, width int, height int) liveou
 		commandStopChannel:   make(chan bool, 1),
 		commandDisplayName:   displayName,
 		command:              cmd,
-		lines:                "",
+		lines:                []string{},
+		lineCount:            0,
 		finished:             false,
 		viewport:             viewport.Model{},
 		helpMenu:             helpMenu,
@@ -179,11 +181,10 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case newline:
-		m.lines += msg.content
-		if !strings.HasSuffix("\n", msg.content) {
-			m.lines += "\n"
-		}
-		m.viewport.SetContent(m.lines)
+		// m.lines = append(m.lines, fmt.Sprintf("%d  %s", m.lineCount, msg.content))
+		// m.lineCount++
+		m.lines = append(m.lines, msg.content)
+		m.viewport.SetContent(strings.Join(m.lines, "\n"))
 		m.viewport.GotoBottom()
 		cmds = append(cmds, m.waitForNewline())
 	case common.LiveoutputCommandFinished:
@@ -272,7 +273,7 @@ func (m liveoutput) getDetailsViewHeight() int {
 func (m *liveoutput) initViewport() {
 	detailsHeight := m.getDetailsViewHeight()
 	m.viewport = viewport.New(m.width, m.height-detailsHeight)
-	m.viewport.SetContent(m.lines)
+	m.viewport.SetContent(strings.Join(m.lines, "\n"))
 }
 
 func (m liveoutput) getStatus() string {
