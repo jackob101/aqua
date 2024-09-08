@@ -21,6 +21,7 @@ type Root struct {
 	content         widgets.MainView
 	keybinds        []common.Keybind
 	keybindsDisplay widgets.KeybindDisplay
+	editorOpen      bool
 }
 
 func (m Root) handleKeybind(msg tea.KeyMsg) tea.Msg {
@@ -70,6 +71,12 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Width:  Width,
 			Height: Height,
 		})
+	case common.LiveoutputEditorOpened:
+		m.editorOpen = true
+		cmds = append(cmds, tea.ExitAltScreen)
+	case common.LiveoutputEditorClosed:
+		m.editorOpen = false
+		cmds = append(cmds, tea.EnterAltScreen)
 	}
 
 	var cmd tea.Cmd
@@ -83,6 +90,9 @@ func (m Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Root) View() string {
+	if m.editorOpen {
+		return ""
+	}
 	keybindsDisplayView := m.keybindsDisplay.View()
 	contentView := m.content.View()
 	return lipgloss.JoinVertical(0, contentView, keybindsDisplayView)
@@ -108,6 +118,7 @@ func main() {
 		content:         widgets.NewContentPane(Width, Height),
 		keybinds:        []common.Keybind{},
 		keybindsDisplay: widgets.KeybindDisplay{},
+		editorOpen:      false,
 	}
 
 	p := tea.NewProgram(root,

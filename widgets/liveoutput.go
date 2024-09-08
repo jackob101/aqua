@@ -5,6 +5,7 @@ import (
 	"jackob101/run/common"
 	"jackob101/run/styles"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -46,6 +47,7 @@ func (m liveoutput) getLiveoutputKeybinds() []common.Keybind {
 		common.NewKeybind(common.LiveoutputToggleDetails{}, "toggle details", "d"),
 		common.NewKeybind(common.LiveoutputUp{}, "scroll up", "up", "k"),
 		common.NewKeybind(common.LiveoutputDown{}, "scroll down", "down", "j"),
+		common.NewKeybind(common.LiveoutputOpenEditor{}, "open editor", "e"),
 	}
 
 	if m.finished {
@@ -175,6 +177,15 @@ func NewLiveoutput(cmd string, displayName string, width int, height int) liveou
 	return lo
 }
 
+func (m liveoutput) openEditor() tea.Cmd {
+	lines := strings.Join(m.lines, "\n")
+	os.WriteFile("/tmp/aqua_tmp.txt", []byte(lines), 0666)
+	cmd := exec.Command("nvim", "/tmp/aqua_tmp.txt")
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return common.LiveoutputEditorClosed{}
+	})
+}
+
 func (m liveoutput) Init() tea.Cmd {
 	return tea.Batch(m.listenForNewline(),
 		m.waitForNewline(),
@@ -230,6 +241,9 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		if m.viewportOffset < 0 {
 			m.viewportOffset = 0
 		}
+	case common.LiveoutputOpenEditor:
+		cmds = append(cmds, m.openEditor())
+		cmds = append(cmds, common.MakeCmd(common.LiveoutputEditorOpened{}))
 	case common.ConfirmationDialogSelected:
 		if m.closeConfirmation != nil {
 			m.closeConfirmation = nil

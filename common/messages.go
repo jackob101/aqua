@@ -51,6 +51,9 @@ type (
 	LiveoutputToggleDetails   struct{}
 	LiveoutputUp              struct{}
 	LiveoutputDown            struct{}
+	LiveoutputOpenEditor      struct{}
+	LiveoutputEditorOpened    struct{}
+	LiveoutputEditorClosed    struct{}
 )
 
 type (
