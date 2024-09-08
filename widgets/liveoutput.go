@@ -344,7 +344,7 @@ func (m liveoutput) viewportView() string {
 
 	result := ""
 	for i, e := range lines {
-		gutter := gutterStyle.Width(gutterNumberCount).Render(strconv.Itoa(i + m.viewportOffset))
+		gutter := gutterStyle.Width(gutterNumberCount).Render(strconv.Itoa(i + m.viewportOffset + 1))
 		result += gutter + e
 
 		if i+1 != m.viewportHeight {
