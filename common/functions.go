@@ -44,3 +44,15 @@ func ElipsisizeText(text string, maxWidth int) string {
 		return text
 	}
 }
+
+func IntDigits(x int) int {
+	if x == 0 {
+		return 1
+	}
+	count := 0
+	for x != 0 {
+		x /= 10
+		count++
+	}
+	return count
+}

@@ -297,8 +297,7 @@ func (m liveoutput) getStatus() string {
 }
 
 func (m liveoutput) viewportView() string {
-	// TODO: this is so fucking dumb xD, find a better way to get int size
-	gutterNumberCount := len(strconv.Itoa(len(m.lines)))
+	gutterNumberCount := common.IntDigits(len(m.lines))
 	gutterSize := gutterNumberCount + gutterStyle.GetMarginRight()
 	lines := []string{}
 	appendedLines := 0
