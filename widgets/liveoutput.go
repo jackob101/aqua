@@ -20,6 +20,7 @@ import (
 
 var (
 	gutterStyle = lipgloss.NewStyle().
+			AlignHorizontal(lipgloss.Right).
 			MarginRight(1).
 			Faint(true)
 	detailsValueStyle = lipgloss.NewStyle().
@@ -178,7 +179,6 @@ func NewLiveoutput(cmd string, displayName string, width int, height int) liveou
 func (m liveoutput) Init() tea.Cmd {
 	return tea.Batch(m.listenForNewline(),
 		m.waitForNewline(),
-		common.MakeCmd(common.LoadViewport{}),
 		m.runtime.Init(),
 		common.MakeCmd(common.SetKeybinds{Keybinds: m.getLiveoutputKeybinds()}),
 	)
@@ -201,12 +201,9 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 		m.finished = true
 		cmds = append(cmds, m.runtime.Stop())
 		cmds = append(cmds, common.SetKeybindsCmd(m.getLiveoutputKeybinds()))
-	case common.LoadViewport:
-		m.initViewport()
 	case common.ContentSectionResize:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.initViewport()
 		cmds = append(cmds, viewport.Sync(m.viewport))
 	case common.LiveoutputClose:
 		confirmationDialogHeight := lipgloss.Height(m.viewport.View())
@@ -267,7 +264,6 @@ func (m liveoutput) View() string {
 	if m.closeConfirmation != nil {
 		mainBody = m.closeConfirmation.View()
 	} else {
-		// mainBody = m.viewport.View()
 		mainBody = lipgloss.NewStyle().
 			Width(m.width).
 			Height(m.viewportHeight).
@@ -292,12 +288,6 @@ func (m liveoutput) getDetailsViewHeight() int {
 	}
 }
 
-func (m *liveoutput) initViewport() {
-	detailsHeight := m.getDetailsViewHeight()
-	m.viewport = viewport.New(m.width, m.height-detailsHeight)
-	m.viewport.SetContent(strings.Join(m.lines, "\n"))
-}
-
 func (m liveoutput) getStatus() string {
 	if m.finished {
 		return "Finished"
@@ -307,39 +297,40 @@ func (m liveoutput) getStatus() string {
 }
 
 func (m liveoutput) viewportView() string {
+	// TODO: this is so fucking dumb xD, find a better way to get int size
+	gutterNumberCount := len(strconv.Itoa(len(m.lines)))
+	gutterSize := gutterNumberCount + gutterStyle.GetMarginRight()
 	lines := []string{}
-	if len(m.lines) < m.viewportHeight {
-		lines = append(lines, m.lines...)
-	} else {
-		appendedLines := 0
-		for _, e := range m.lines[m.viewportOffset:] {
-			if appendedLines > m.viewportHeight {
-				break
-			}
-			lineWidth := lipgloss.Width(e)
-			if lineWidth >= m.width {
-				chunkSize := m.width - 20
-				for i := 0; i < lipgloss.Width(e); i += chunkSize {
-					if appendedLines > m.viewportHeight {
-						break
-					}
-					part := e[i:min(lineWidth, i+chunkSize)]
-					lines = append(lines, part)
-					appendedLines++
+	appendedLines := 0
+	for _, e := range m.lines[m.viewportOffset:] {
+		if appendedLines >= m.viewportHeight {
+			break
+		}
+		lineWidth := lipgloss.Width(e)
+		chunkSize := m.width - gutterSize
+		if lineWidth > chunkSize {
+			for i := 0; i < lipgloss.Width(e); i += chunkSize {
+				if appendedLines >= m.viewportHeight {
+					break
 				}
-			} else {
-				lines = append(lines, e)
+				part := e[i:min(lineWidth, i+chunkSize)]
+				lines = append(lines, part)
 				appendedLines++
 			}
+		} else {
+			lines = append(lines, e)
+			appendedLines++
 		}
 	}
 
-	gutterNumberCount := strconv.Itoa(len(m.lines))
-
 	result := ""
 	for i, e := range lines {
-		gutter := gutterStyle.Width(len(gutterNumberCount)).Render(strconv.Itoa(i + m.viewportOffset))
-		result += gutter + e + "\n"
+		gutter := gutterStyle.Width(gutterNumberCount).Render(strconv.Itoa(i + m.viewportOffset))
+		result += gutter + e
+
+		if i+1 != m.viewportHeight {
+			result += "\n"
+		}
 	}
 
 	return result
