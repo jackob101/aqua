@@ -43,7 +43,7 @@ var (
 
 func (m liveoutput) getLiveoutputKeybinds() []common.Keybind {
 	liveoutputKeybinds := []common.Keybind{
-		common.NewKeybind(common.LiveoutputClose{}, "close", "esc"),
+		common.NewKeybind(common.LiveoutputClose{}, "close", "esc", "q"),
 		common.NewKeybind(common.LiveoutputToggleDetails{}, "toggle details", "d"),
 		common.NewKeybind(common.LiveoutputUp{}, "scroll up", "up", "k"),
 		common.NewKeybind(common.LiveoutputDown{}, "scroll down", "down", "j"),
