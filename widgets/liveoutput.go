@@ -2,7 +2,6 @@ package widgets
 
 import (
 	"bufio"
-	"fmt"
 	"jackob101/run/common"
 	"jackob101/run/styles"
 	"log/slog"
@@ -200,7 +199,9 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 	case common.LiveoutputCommandFinished:
 		m.finished = true
 		cmds = append(cmds, m.runtime.Stop())
-		cmds = append(cmds, common.SetKeybindsCmd(m.getLiveoutputKeybinds()))
+		if m.closeConfirmation == nil {
+			cmds = append(cmds, common.SetKeybindsCmd(m.getLiveoutputKeybinds()))
+		}
 	case common.ContentSectionResize:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -262,7 +263,11 @@ func (m liveoutput) Update(msg tea.Msg) (liveoutput, tea.Cmd) {
 func (m liveoutput) View() string {
 	var mainBody string
 	if m.closeConfirmation != nil {
-		mainBody = m.closeConfirmation.View()
+		mainBody = lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.viewportHeight).
+			AlignVertical(lipgloss.Center).
+			Render(m.closeConfirmation.View())
 	} else {
 		mainBody = lipgloss.NewStyle().
 			Width(m.width).
@@ -271,7 +276,8 @@ func (m liveoutput) View() string {
 	}
 
 	if m.showDetails {
-		return fmt.Sprintf("%s\n%s",
+		return lipgloss.JoinVertical(
+			0,
 			m.detailsView(),
 			mainBody,
 		)
