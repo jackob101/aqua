@@ -144,7 +144,7 @@ func (m *liveoutput) restartCommand() tea.Cmd {
 		m.lines = []string{}
 		m.commandOutputChannel = make(chan string)
 		m.finished = false
-		m.viewport.SetContent(strings.Join(m.lines, "\n"))
+		m.viewportOffset = 0
 		return tea.Batch(m.listenForNewline(),
 			m.waitForNewline(),
 			m.runtime.Reset(),
