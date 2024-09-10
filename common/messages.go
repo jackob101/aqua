@@ -1,7 +1,7 @@
 package common
 
 import (
-	"jackob101/run/common/dto"
+	"jackob101/aqua/common/dto"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

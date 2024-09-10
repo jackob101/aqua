@@ -1,7 +1,7 @@
 package widgets
 
 import (
-	"jackob101/run/common"
+	"jackob101/aqua/common"
 	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"

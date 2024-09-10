@@ -1,4 +1,4 @@
-module jackob101/run
+module jackob101/aqua
 
 go 1.22.4
 

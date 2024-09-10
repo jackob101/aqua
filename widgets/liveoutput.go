@@ -2,8 +2,8 @@ package widgets
 
 import (
 	"bufio"
-	"jackob101/run/common"
-	"jackob101/run/styles"
+	"jackob101/aqua/common"
+	"jackob101/aqua/styles"
 	"log/slog"
 	"os"
 	"os/exec"

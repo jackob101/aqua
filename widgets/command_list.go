@@ -2,9 +2,9 @@ package widgets
 
 import (
 	"fmt"
-	"jackob101/run/common"
-	"jackob101/run/common/dto"
-	"jackob101/run/internal"
+	"jackob101/aqua/common"
+	"jackob101/aqua/common/dto"
+	"jackob101/aqua/internal"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"

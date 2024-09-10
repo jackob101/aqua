@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"jackob101/run/common"
-	"jackob101/run/widgets"
+	"jackob101/aqua/common"
+	"jackob101/aqua/widgets"
 	"log/slog"
 	"os"
 	"reflect"
